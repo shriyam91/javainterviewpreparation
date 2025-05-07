@@ -1,0 +1,236 @@
+The newest version of the Java platform, Java 8, was released more than a year ago. Many companies and developers are still working with previous versions, which is understandable, since there are a lot of problems with migrating from one platform version to another. Even so, many developers are still starting new applications with old versions of Java. There are very few good reasons to do this, because Java 8 has brought some important improvements to the language.
+
+There are many new features in Java 8. I’ll show you a handful of the most useful and interesting ones:
+
+Lambda expressions
+Stream API for working with Collections
+Asynchronous task chaining with CompletableFuture
+Brand new Time API
+Lambda Expressions
+A lambda is a code block which can be referenced and passed to another piece of code for future execution one or more times. For example, anonymous functions in other 
+languages are lambdas. Like functions, lambdas can be passed arguments at the time of their execution, modifying their results. Java 8 introduced lambda expressions,
+ which offer a simple syntax to create and use lambdas.
+
+Let’s see an example of how this can improve our code. Here we have a simple comparator which compares two Integer values by their modulo 2:
+
+class BinaryComparator implements Comparator<Integer>{
+   @Override
+   public int compare(Integer i1, Integer i2) {
+       return i1 % 2 - i2 % 2;
+   }
+}
+An instance of this class may be called, in the future, in code where this comparator is needed, like this:
+
+...
+List<Integer> list = ...;
+Comparator<Integer> comparator = new BinaryComparator();
+Collections.sort(list, comparator);
+...
+The new lambda syntax allows us to do this more simply. Here is a simple lambda expression which does the same thing as the compare method from BinaryComparator:
+
+(Integer i1, Integer i2) -> i1 % 2 - i2 % 2;
+The structure has many similarities to a function. In parentheses, we set up a list of arguments. The syntax -> shows that this is a lambda. And in the right-hand part of this expression, we set up the behavior of our lambda.
+
+JAVA 8 LAMBDA EXPRESSION
+Now we can improve our previous example:
+
+...
+List<Integer> list = ...;
+Collections.sort(list, (Integer i1, Integer i2) -> i1 % 2 - i2 % 2);
+...
+We may define a variable with this object. Let’s see how it looks:
+
+Comparator<Integer> comparator = (Integer i1, Integer i2) -> i1 % 2 - i2 % 2;
+Now we can reuse this functionality, like this:
+
+...
+List<Integer> list1 = ...;
+List<Integer> list2 = ...;
+Collections.sort(list1, comparator);
+Collections.sort(list2, comparator);
+...
+Notice that in these examples, the lambda is being passed in to the sort() method in the same way that the instance of BinaryComparator is passed in the earlier example. How does the JVM know to interpret the lambda correctly?
+
+To allow functions to take lambdas as arguments, Java 8 introduces a new concept: functional interface. A functional interface is an interface that has only one abstract method. In fact, Java 8 treats lambda expressions as a special implementation of a functional interface. This means that, in order to receive a lambda as a method argument, that argument’s declared type only needs to be a functional interface.
+
+When we declare a functional interface, we may add the @FunctionalInterface notation to show developers what it is:
+
+@FunctionalInterface
+private interface DTOSender {
+   void send(String accountId, DTO dto);
+}
+
+void sendDTO(BisnessModel object, DTOSender dtoSender) {
+   //some logic for sending...
+   ...
+   dtoSender.send(id, dto);
+   ...
+}
+Now, we can call the method sendDTO, passing in different lambdas to achieve different behavior, like this:
+
+sendDTO(object, ((accountId, dto) -> sendToAndroid(accountId, dto)));
+sendDTO(object, ((accountId, dto) -> sendToIos(accountId, dto)));
+Method References
+Lambda arguments allow us to modify the behavior of a function or method. As we can see in the last example, sometimes the lambda only serves to call another method (sendToAndroid or sendToIos). For this special case, Java 8 introduces a convenient shorthand: method references. This abbreviated syntax represents a lambda that calls a method, and has the form objectName::methodName. This allows us to make the previous example even more concise and readable:
+
+sendDTO(object, this::sendToAndroid);
+sendDTO(object, this::sendToIos);
+In this case, the methods sendToAndroid and sendToIos are implemented in this class. We may also reference the methods of another object or class.
+
+Stream API
+Java 8 brings new abilities to work with Collections, in the form of a brand new Stream API. This new functionality is provided by the java.util.stream package, and is aimed at enabling a more functional approach to programming with collections. As we’ll see, this is possible largely thanks to the new lambda syntax we just discussed.
+
+The Stream API offers easy filtering, counting, and mapping of collections, as well as different ways to get slices and subsets of information out of them. Thanks to the functional-style syntax, the Stream API allows shorter and more elegant code for working with collections.
+
+Lets start with a short example. We will use this data model in all examples:
+
+class Author {
+   String name;
+   int countOfBooks;
+}
+
+class Book {
+   String name;
+   int year;
+   Author author;
+}
+Let’s imagine that we need to print all authors in a books collection who wrote a book after 2005. How would we do it in Java 7?
+
+for (Book book : books) {
+   if (book.author != null && book.year > 2005){
+       System.out.println(book.author.name);
+   }
+}
+And how would we do it in Java 8?
+
+
+books.stream()
+       .filter(book -> book.year > 2005)  // filter out books published in or before 2005
+       .map(Book::getAuthor)              // get the list of authors for the remaining books
+       .filter(Objects::nonNull)          // remove null authors from the list
+       .map(Author::getName)              // get the list of names for the remaining authors
+       .forEach(System.out::println);     // print the value of each remaining element
+It is only one expression! Calling the method stream() on any Collection returns a Stream object encapsulating all the elements of that collection. This can be manipulated with different modifiers from the Stream API, such as filter() and map(). Each modifier returns a new Stream object with the results of the modification, which can be further manipulated. The .forEach() method allows us to perform some action for each instance of the resulting stream.
+
+This example also demonstrates the close relationship between functional programming and lambda expressions. Notice that the argument passed to each method in the stream is either a custom lambda, or a method reference. Technically, each modifier can receive any functional interface, as described in the previous section.
+
+The Stream API helps developers look at Java collections from a new angle. Imagine now that we need to get a Map of available languages in each country. How would this be implemented in Java 7?
+
+Map<String, Set<String>> countryToSetOfLanguages = new HashMap<>();
+
+for (Locale locale : Locale.getAvailableLocales()){
+   String country = locale.getDisplayCountry();
+   if (!countryToSetOfLanguages.containsKey(country)){
+       countryToSetOfLanguages.put(country, new HashSet<>());
+   }
+   countryToSetOfLanguages.get(country).add(locale.getDisplayLanguage());
+}
+In Java 8, things are a little neater:
+
+import java.util.stream.*;
+import static java.util.stream.Collectors.*;
+
+...
+Map<String, Set<String>> countryToSetOfLanguages = Stream.of(Locale.getAvailableLocales())
+      .collect(groupingBy(Locale::getDisplayCountry,
+                          mapping(Locale::getDisplayLanguage, toSet())));
+The method collect() allows us to collect the results of a stream in different ways. Here, we can see that it firstly groups by country, and then maps each group by language. (groupingBy() and toSet() are both static methods from the Collectors class.)
+
+JAVA 8 STREAM API
+There are a lot of other abilities of Stream API. The complete documentation can be found here. I recommend reading further to gain a deeper understanding of all the powerful tools this package has to offer.
+
+Asynchronous Task Chaining with CompletableFuture
+In Java 7’s java.util.concurrent package, there is an interface Future<T>, which allows us to get the status or result of some asynchronous task in the future. To use this functionality, we must:
+
+Create an ExecutorService, which manages the execution of asynchronous tasks, and can generate Future objects to track their progress.
+Create an asynchronously Runnable task.
+Run the task in the ExecutorService, which will provide a Future giving access to the status or results.
+In order to make use of the results of an asynchronous task, it is necessary to monitor its progress from the outside, using the methods of the Future interface, and when it is ready, explicitly retrieve the results and perform further actions with them. This can be rather complex to implement without errors, especially in applications with large numbers of concurrent tasks.
+
+In Java 8, however, the Future concept is taken further, with the CompletableFuture<T> interface, which allows creation and execution of chains of asynchronous tasks. It is a powerful mechanism to create asynchronous applications in Java 8, because it allows us to automatically process the results of each task upon completion.
+
+Let’s see an example:
+
+import java.util.concurrent.CompletableFuture;
+...
+CompletableFuture<Void> voidCompletableFuture = CompletableFuture.supplyAsync(() -> blockingReadPage())
+       .thenApply(this::getLinks)
+       .thenAccept(System.out::println);
+The method CompletableFuture.supplyAsync creates a new asynchronous task in the default Executor (typically ForkJoinPool). When the task is finished, its results will be automatically supplied as arguments to the function this::getLinks, which is also run in a new asynchronous task. Finally, the results of this second stage are automatically printed to System.out. thenApply() and thenAccept() are just two of several useful methods available to help you build concurrent tasks without manually using Executors.
+
+The CompletableFuture makes it easy to manage sequencing of complex asynchronous operations. Say we need to create a multi-step mathematical operation with three tasks. Task 1 and task 2 use different algorithms to find a result for the first step, and we know that only one of them will work while the other will fail. However, which one works depends on the input data, which we do not know ahead of time. The result from these tasks must be summed with the result of task 3. Thus, we need to find the result of either task 1 or task 2, and the result of task 3. To achieve this, we can write something like this:
+
+import static java.util.concurrent.CompletableFuture.*;
+
+...
+
+Supplier<Integer> task1 = (...) -> {
+   ...                                   // some complex calculation
+   return 1;                             // example result
+};
+
+Supplier<Integer> task2 = (...) -> {
+   ...                                   // some complex calculation
+   throw new RuntimeException();         // example exception
+};
+
+Supplier<Integer> task3 = (...) -> {
+   ...                                   // some complex calculation 
+   return 3;                             // example result
+};
+
+supplyAsync(task1)     // run task1
+       .applyToEither(                   // use whichever result is ready first, result of task1 or
+               supplyAsync(task2),       // result of task2
+               (Integer i) -> i)         // return result as-is
+       .thenCombine(                     // combine result
+               supplyAsync(task3),       // with result of task3
+               Integer::sum)             // using summation
+       .thenAccept(System.out::println); // print final result after execution
+
+If we examine how Java 8 handles this, we will see that all three tasks will be run at the same time, asynchronously. Despite task 2 failing with an exception, the final result will be computed and printed successfully.
+
+JAVA 8 ASYNCHRONOUS PROGRAMMING WITH CompletableFuture
+CompletableFuture makes it much easier to build asynchronous tasks with multiple stages, and gives us an easy interface for defining exactly what actions should be taken at the completion of each stage.
+
+Java Date and Time API
+As stated by Java’s own admission:
+
+Prior to the Java SE 8 release, the Java date and time mechanism was provided by the java.util.Date, java.util.Calendar, and java.util.TimeZone classes, as well as their subclasses, such as java.util.GregorianCalendar. These classes had several drawbacks, including
+
+The Calendar class was not type safe.
+Because the classes were mutable, they could not be used in multithreaded applications.
+Bugs in application code were common due to the unusual numbering of months and the lack of type safety.”
+Java 8 finally solves these long-standing issues, with the new java.time package, which contains classes for working with date and time. All of them are immutable and have APIs similar to the popular framework Joda-Time, which almost all Java developers use in their applications instead of the native Date, Calendar, and TimeZone.
+
+Here are some of the useful classes in this package:
+
+Clock - A clock to tell the current time, including the current instant, date, and time with time-zone.
+Duration, and Period - An amount of time. Duration uses time-based values such as “76.8 seconds, and Period, date-based, such as “4 years, 6 months and 12 days”.
+Instant - An instantaneous point in time, in several formats.
+LocalDate, LocalDateTime, LocalTime, Year, YearMonth - A date, time, year, month, or some combination thereof, without a time-zone in the ISO-8601 calendar system.
+OffsetDateTime, OffsetTime - A date-time with an offset from UTC/Greenwich in the ISO-8601 calendar system, such as “2015-08-29T14:15:30+01:00.”
+ZonedDateTime - A date-time with an associated time-zone in the ISO-8601 calendar system, such as “1986-08-29T10:15:30+01:00 Europe/Paris.”
+JAVA 8 TIME API
+Sometimes, we need to find some relative date such as “first Tuesday of the month.” For these cases java.time provides a special class TemporalAdjuster. The TemporalAdjuster class contains a standard set of adjusters, available as static methods. These allow us to:
+
+Find the first or last day of the month.
+Find the first or last day of the next or previous month.
+Find the first or last day of the year.
+Find the first or last day of the next or previous year.
+Find the first or last day-of-week within a month, such as “first Wednesday in June.”
+Find the next or previous day-of-week, such as “next Thursday.”
+Here’s a short example how to get the first Tuesday of the month:
+
+LocalDate getFirstTuesday(int year, int month) {
+   return LocalDate.of(year, month, 1)
+                   .with(TemporalAdjusters.nextOrSame(DayOfWeek.TUESDAY));
+}
+Still using Java 7? Get with the program! #Java8
+
+Java 8 in Summary
+As we can see, Java 8 is an epochal release of the Java platform. There are a lot of language changes, particularly with the introduction of lambdas, which represents a move to bring more functional programming abilities into Java. The Stream API is a good example how lambdas can change the way we work with standard Java tools that we are already used to.
+
+Also, Java 8 brings some new features for working with asynchronous programming and a much-needed overhaul of its date-and-time tools.
+
+Together, these changes represent a big step forward for the Java language, making Java development more interesting and more efficient.
